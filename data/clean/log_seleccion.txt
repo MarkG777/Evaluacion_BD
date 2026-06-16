@@ -1,0 +1,235 @@
+
+=================================================================
+  CARGA DEL DATASET LIMPIO
+=================================================================
+
+  Archivo cargado: data\clean\lecturas_limpias.csv
+  Shape          : (8573, 21)
+  Columnas       : ['sensor_id', 'mac_address', 'tipo_sensor', 'colmena_id', 'colmena_nombre', 'apiario_nombre', 'ubicacion', 'temperatura', 'humedad', 'peso', 'sonido', 'lluvia', 'fecha_registro', 'año', 'mes', 'semana', 'dia_semana', 'hora', 'es_fin_semana', 'es_noche', 'periodo_dia']
+
+=================================================================
+  DEFINICIÓN DE VARIABLE OBJETIVO (TARGET)
+=================================================================
+
+  Target: alerta_temperatura
+  Definición: temperatura > 35.0°C
+  Base científica: Owens (1971) y Seeley (1985) —
+    temperatura interior de colmena saludable: 32–36°C.
+    Por encima de 35°C se activan las 'abejas de ventilación'
+    (fanners), lo que correlaciona con cambios en sonido y humedad.
+
+  Distribución del target:
+    Clase 0 (sin alerta) :   8364 (97.56%)
+    Clase 1 (alerta)     :    209 (2.44%)
+
+=================================================================
+  PREPARACIÓN DE FEATURES PARA SELECCIÓN
+=================================================================
+
+  Codificación LabelEncoder:
+    tipo_sensor : {0: 'Multisensor', 1: 'Temperatura/Humedad'}
+    periodo_dia : {0: 'madrugada', 1: 'manana', 2: 'noche', 3: 'tarde'}
+
+  Dataset para selección: (8573, 13)
+  Features candidatas (12): ['humedad', 'peso', 'sonido', 'lluvia', 'hora', 'dia_semana', 'mes', 'semana', 'es_noche', 'es_fin_semana', 'tipo_sensor_enc', 'periodo_dia_enc']
+
+=================================================================
+  MÉTODO 1: Correlación de Pearson (r de Pearson)
+=================================================================
+
+  El coeficiente de correlación de Pearson mide la relación
+  lineal entre cada feature y el target.
+    |r| ≥ 0.5 → correlación fuerte
+    |r| ≥ 0.3 → correlación moderada
+    |r| < 0.1 → correlación débil (candidata a descartar)
+
+  Se usa como filtro previo para eliminar features sin
+  ninguna relación lineal con el target.
+
+  Correlación de Pearson con 'alerta_temperatura':
+
+  humedad               : r = -0.2536  ▓▓▓▓▓▓▓▓▓▓  🟡 Moderada
+  es_noche              : r = -0.1455  ▓▓▓▓▓  🟡 Moderada
+  sonido                : r = +0.1429  ▓▓▓▓▓  🟡 Moderada
+  tipo_sensor_enc       : r = -0.1119  ▓▓▓▓  🟡 Moderada
+  periodo_dia_enc       : r = +0.0835  ▓▓▓  🟠 Débil
+  peso                  : r = -0.0681  ▓▓  🟠 Débil
+  lluvia                : r = -0.0109    🔴 Descartar
+  es_fin_semana         : r = +0.0073    🔴 Descartar
+  mes                   : r = -0.0069    🔴 Descartar
+  dia_semana            : r = +0.0066    🔴 Descartar
+  semana                : r = -0.0041    🔴 Descartar
+  hora                  : r = +0.0021    🔴 Descartar
+
+  → Features con |r| < 0.02 (candidatas a descartar):
+    ['lluvia', 'es_fin_semana', 'mes', 'dia_semana', 'semana', 'hora']
+
+  Matriz de correlación entre features (10 features principales):
+                 humedad  es_noche  sonido  tipo_sensor_enc  periodo_dia_enc   peso  lluvia  es_fin_semana    mes  dia_semana
+humedad            1.000     0.814  -0.771            0.033           -0.417  0.046   0.002         -0.002 -0.000      -0.001
+es_noche           0.814     1.000  -0.939            0.001           -0.560 -0.003  -0.009         -0.000 -0.001      -0.000
+sonido            -0.771    -0.939   1.000           -0.006            0.529  0.003   0.005          0.001  0.010      -0.002
+tipo_sensor_enc    0.033     0.001  -0.006            1.000           -0.001 -0.000   0.012          0.001  0.000       0.001
+periodo_dia_enc   -0.417    -0.560   0.529           -0.001            1.000  0.002  -0.009          0.001  0.001      -0.000
+peso               0.046    -0.003   0.003           -0.000            0.002  1.000   0.010         -0.079  0.659      -0.062
+lluvia             0.002    -0.009   0.005            0.012           -0.009  0.010   1.000         -0.015  0.002      -0.006
+es_fin_semana     -0.002    -0.000   0.001            0.001            0.001 -0.079  -0.015          1.000 -0.072       0.767
+mes               -0.000    -0.001   0.010            0.000            0.001  0.659   0.002         -0.072  1.000      -0.085
+dia_semana        -0.001    -0.000  -0.002            0.001           -0.000 -0.062  -0.006          0.767 -0.085       1.000
+
+=================================================================
+  MÉTODO 2: Umbral de Varianza (Variance Threshold)
+=================================================================
+
+  Una feature con varianza muy baja (cuasi-constante) no aporta
+  información discriminativa. Se eliminan features con varianza
+  inferior a 0.01.
+
+  Ejemplo: si 'es_fin_semana' es 0 en el 99% de los datos,
+  no ayuda a distinguir entre clases.
+
+  Varianza de cada feature (umbral = 0.01):
+
+  lluvia                : var =     0.0460    ✅ CONSERVAR
+  es_fin_semana         : var =     0.1956    ✅ CONSERVAR
+  tipo_sensor_enc       : var =     0.2224    ✅ CONSERVAR
+  mes                   : var =     0.2455    ✅ CONSERVAR
+  es_noche              : var =     0.2483    ✅ CONSERVAR
+  peso                  : var =     0.3620  █  ✅ CONSERVAR
+  periodo_dia_enc       : var =     1.2494  ███  ✅ CONSERVAR
+  semana                : var =     1.6639  ████  ✅ CONSERVAR
+  dia_semana            : var =     3.7647  ███████████  ✅ CONSERVAR
+  hora                  : var =    47.9174  ████████████████████████████████████████  ✅ CONSERVAR
+  sonido                : var =    72.3985  ████████████████████████████████████████  ✅ CONSERVAR
+  humedad               : var =    83.8401  ████████████████████████████████████████  ✅ CONSERVAR
+
+  → Descartadas por baja varianza: []
+  → Features restantes (12): ['humedad', 'peso', 'sonido', 'lluvia', 'hora', 'dia_semana', 'mes', 'semana', 'es_noche', 'es_fin_semana', 'tipo_sensor_enc', 'periodo_dia_enc']
+
+=================================================================
+  MÉTODO 3: Chi-Cuadrado (χ²) — Variables Categóricas
+=================================================================
+
+  El test de Chi-Cuadrado evalúa si existe una asociación
+  estadísticamente significativa entre cada variable discreta/
+  categórica y el target (alerta_temperatura).
+
+  H₀: la variable es independiente del target.
+  Si p-valor < α (0.05) → rechazamos H₀ → la variable es relevante.
+
+  Requiere valores no negativos → se aplica MinMaxScaler previo.
+
+  Resultados Test χ² (α = 0.05):
+
+  es_noche              : χ²=     98.2280  p=0.00000000  ✅ Significativo
+  tipo_sensor_enc       : χ²=     71.5408  p=0.00000000  ✅ Significativo
+  periodo_dia_enc       : χ²=     16.5792  p=0.00004666  ✅ Significativo
+  lluvia                : χ²=      0.9715  p=0.32431762  ❌ No significativo
+  es_fin_semana         : χ²=      0.3314  p=0.56485730  ❌ No significativo
+
+  → Descartadas por χ² no significativo (p≥0.05): ['lluvia', 'es_fin_semana']
+
+=================================================================
+  MÉTODO 4: Importancia de Features — Random Forest (150 árboles)
+=================================================================
+
+  Random Forest entrena múltiples árboles de decisión y mide
+  cuánto reduce cada feature la impureza de Gini en promedio.
+  Features con importancia baja no contribuyen al modelo.
+
+  Umbral de corte: importancia ≥ 0.02
+
+  Importancia de Features (Gini Importance):
+
+  humedad               : 0.53160  ██████████████████████████████████████████  ✅ RETENER
+  hora                  : 0.12846  ██████████  ✅ RETENER
+  sonido                : 0.12244  █████████  ✅ RETENER
+  tipo_sensor_enc       : 0.07814  ██████  ✅ RETENER
+  es_noche              : 0.06445  █████  ✅ RETENER
+  peso                  : 0.04474  ███  ✅ RETENER
+  periodo_dia_enc       : 0.01226    ❌ DESCARTAR
+  dia_semana            : 0.00762    ❌ DESCARTAR
+  semana                : 0.00730    ❌ DESCARTAR
+  mes                   : 0.00298    ❌ DESCARTAR
+
+  → Features conservadas (6): ['humedad', 'hora', 'sonido', 'tipo_sensor_enc', 'es_noche', 'peso']
+  → Features descartadas (4): ['periodo_dia_enc', 'dia_semana', 'semana', 'mes']
+
+=================================================================
+  CONSOLIDACIÓN DE RESULTADOS — RESUMEN DE SELECCIÓN
+=================================================================
+
+  ┌─────────────────────────────────────────────────────────┐
+  │         RESUMEN DE SELECCIÓN DE CARACTERÍSTICAS         │
+  ├─────────────────────────────────────────────────────────┤
+  │ Features candidatas iniciales :  12                     │
+  │ Método 1 — Pearson descartó   :   6                     │
+  │ Método 2 — Varianza descartó  :   0                     │
+  │ Método 3 — Chi² descartó      :   2                     │
+  │ Método 4 — Random Forest       :   6 conservadas           │
+  └─────────────────────────────────────────────────────────┘
+
+  Features FINALES para el modelo: ['humedad', 'hora', 'sonido', 'tipo_sensor_enc', 'es_noche', 'peso']
+
+  Justificación de cada feature conservada:
+  • humedad               : r=-0.xx con target (inverso a temp), χ² significativo
+  • hora                  : temperatura sigue ciclo diario coseno (alta correlación temporal)
+  • sonido                : correlaciona con actividad de abejas bajo estrés térmico
+  • tipo_sensor_enc       : sensores Multisensor tienen lecturas en diferentes colmenas
+  • es_noche              : proxy binario del ciclo día/noche — alta información mutua
+  • peso                  : estrés térmico puede coincidir con pérdida de peso (enjambre)
+
+=================================================================
+  GENERACIÓN DE EVIDENCIA VISUAL (figuras/)
+=================================================================
+
+  ✅ Fig. 1 guardada: figures\fig1_heatmap_correlacion.png
+  ✅ Fig. 2 guardada: figures\fig2_pearson_target.png
+  ✅ Fig. 3 guardada: figures\fig3_varianza.png
+  ✅ Fig. 4 guardada: figures\fig4_chi2_pvalues.png
+  ✅ Fig. 5 guardada: figures\fig5_rf_importance.png
+
+  Todas las figuras en: figures/
+
+=================================================================
+  DATASET FINAL OPTIMIZADO
+=================================================================
+
+  Reducción dimensional:
+    Features originales    : 12
+    Features conservadas   : 6
+    Porcentaje reducción   : 50.0%
+
+  Estadísticas del dataset final:
+        humedad       hora     sonido  tipo_sensor_enc   es_noche       peso  alerta_temperatura
+count  8573.000  8573.0000  8573.0000        8573.0000  8573.0000  8573.0000           8573.0000
+mean     61.955    11.5114    57.6789           0.3340     0.4585    15.9101              0.0244
+std       9.157     6.9226     8.5092           0.4717     0.4983     0.6017              0.1542
+min      44.270     0.0000    44.0000           0.0000     0.0000    14.4400              0.0000
+25%      53.320     6.0000    49.4400           0.0000     0.0000    15.6100              0.0000
+50%      62.010    12.0000    60.7700           0.0000     0.0000    15.9100              0.0000
+75%      70.520    18.0000    65.4800           1.0000     1.0000    16.2200              0.0000
+max      79.580    23.0000    70.0000           1.0000     1.0000    17.3800              1.0000
+
+  Distribución del target en dataset final:
+    Clase 0: 8364
+    Clase 1: 209
+
+  ✅ Dataset optimizado guardado: data\clean\dataset_final_features.csv
+     Shape: (8573, 7)
+
+  ─────────────────────────────────────────────────────────
+  ARCHIVOS GENERADOS EN ESTA PRÁCTICA:
+    data/raw/lecturas_crudas.csv         ← Dataset sucio (00_)
+    data/clean/lecturas_limpias.csv      ← Dataset limpio (02_)
+    data/clean/dataset_final_features.csv← Dataset optimizado (03_)
+    data/clean/log_limpieza.txt          ← Log pipeline DE
+    data/clean/log_seleccion.txt         ← Log selección AU
+
+  SIGUIENTE PASO SUGERIDO:
+    Usar dataset_final_features.csv para entrenar:
+    - XGBoost con ventanas temporales (recomendado)
+    - Random Forest como baseline
+    - Prophet para predicción de tendencias
+  ─────────────────────────────────────────────────────────
+

@@ -1,0 +1,143 @@
+\section{SA --- Evidencia del Saber: Arquitectura del Data Warehouse}
+
+\subsection{Esquema de Data Warehouse --- Estrella (Star Schema)}
+
+Se opt\'o por el \textbf{Esquema en Estrella} debido a que la tabla de hechos
+(\texttt{fact\_lecturas\_ambientales}) contiene m\'etricas num\'ericas bien definidas,
+las dimensiones tienen cardinalidad estable (Slowly Changing Dimensions tipo 1), y el
+modelo ofrece mayor eficiencia en consultas OLAP que el esquema copo de nieve.
+
+\begin{table}[h!]
+  \centering
+  \caption{Tabla de Hechos: \texttt{fact\_lecturas\_ambientales}}
+  \rowcolors{2}{grisCelda}{white}
+  \begin{tabularx}{\textwidth}{llX}
+    \toprule
+    \textbf{Columna} & \textbf{Tipo} & \textbf{Descripci\'on} \\
+    \midrule
+    \texttt{id\_lectura}  & BIGSERIAL PK  & Clave surrogate autogenerada \\
+    \texttt{sk\_sensor}   & INTEGER FK    & $\rightarrow$ \texttt{dim\_sensor} \\
+    \texttt{sk\_tiempo}   & INTEGER FK    & $\rightarrow$ \texttt{dim\_tiempo} \\
+    \texttt{sk\_colmena}  & INTEGER FK    & $\rightarrow$ \texttt{dim\_colmena} \\
+    \texttt{sk\_apiario}  & INTEGER FK    & $\rightarrow$ \texttt{dim\_apiario} \\
+    \texttt{temperatura}  & DECIMAL(5,2)  & \textcelsius{} interior de la colmena \\
+    \texttt{humedad}      & DECIMAL(5,2)  & \% de humedad relativa \\
+    \texttt{peso}         & DECIMAL(6,2)  & kg totales de la colmena (NULL si no aplica) \\
+    \texttt{sonido}       & DECIMAL(5,2)  & dB de actividad son\'ora \\
+    \texttt{lluvia}       & SMALLINT      & 1~=~lluvia, 0~=~sin lluvia \\
+    \texttt{alerta\_temp} & SMALLINT      & 1 si temperatura $>$ 35\textcelsius{} (calculado) \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\textbf{Granularidad:} una fila representa la lectura de un sensor cada 15 minutos.
+
+\begin{table}[h!]
+  \centering
+  \caption{Dimensiones del Data Warehouse}
+  \rowcolors{2}{grisCelda}{white}
+  \begin{tabularx}{\textwidth}{llX}
+    \toprule
+    \textbf{Dimensi\'on} & \textbf{Clave PK} & \textbf{Atributos principales} \\
+    \midrule
+    \texttt{dim\_tiempo}  & \texttt{sk\_tiempo}  & fecha\_completa, a\~no, mes, semana, dia\_semana, hora, periodo\_dia, es\_noche, es\_fin\_semana, es\_hora\_activa\_abejas \\
+    \texttt{dim\_sensor}  & \texttt{sk\_sensor}  & mac\_address, tipo\_sensor, estado, fecha\_instalacion \\
+    \texttt{dim\_colmena} & \texttt{sk\_colmena} & nombre\_colmena, descripcion, fecha\_creacion \\
+    \texttt{dim\_apiario} & \texttt{sk\_apiario} & nombre\_apiario, descripcion\_general, coordenadas \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\subsection{Tipos y Fuentes de Datos}
+
+\begin{table}[h!]
+  \centering
+  \caption{Inventario de variables por tipo estad\'istico}
+  \rowcolors{2}{grisCelda}{white}
+  \begin{tabularx}{\textwidth}{lllX}
+    \toprule
+    \textbf{Variable} & \textbf{Tipo} & \textbf{Escala} & \textbf{Rango / Valores} \\
+    \midrule
+    \texttt{temperatura}  & Continua    & Raz\'on    & $[0, 45]$ \textcelsius{} \\
+    \texttt{humedad}      & Continua    & Raz\'on    & $[40, 95]$ \% \\
+    \texttt{peso}         & Continua    & Raz\'on    & $[10, 30]$ kg \\
+    \texttt{sonido}       & Continua    & Raz\'on    & $[40, 80]$ dB \\
+    \texttt{lluvia}       & Discreta    & Nominal    & $\{0, 1\}$ \\
+    \texttt{tipo\_sensor} & Categ\'orica & Nominal   & Temperatura/Humedad, Multisensor \\
+    \texttt{estado}       & Categ\'orica & Ordinal   & activo, mantenimiento, inactivo, no\_asignado \\
+    \texttt{hora}         & Discreta    & C\'iclica  & $[0, 23]$ \\
+    \texttt{dia\_semana}  & Discreta    & Ordinal    & $[0, 6]$ \\
+    \texttt{es\_noche}    & Discreta    & Nominal    & $\{0, 1\}$ \\
+    \texttt{alerta\_temp} & Discreta    & Nominal    & $\{0, 1\}$ (variable objetivo) \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\begin{table}[h!]
+  \centering
+  \caption{Fuentes de datos del proyecto}
+  \rowcolors{2}{grisCelda}{white}
+  \begin{tabularx}{\textwidth}{llX}
+    \toprule
+    \textbf{Fuente} & \textbf{Tipo} & \textbf{Descripci\'on} \\
+    \midrule
+    ESP32 $\rightarrow$ POST \texttt{/api/sensor-data} & Estructurada en tiempo real & Lecturas cada 10 min con cabecera X-API-Key \\
+    \texttt{generate\_mock\_data.js} & Sint\'etica estructurada & Simulaci\'on de 30 d\'ias en Node.js \\
+    \texttt{00\_generar\_datos.py}   & Sint\'etica estructurada & Dataset de esta pr\'actica con problemas de calidad intencionales \\
+    \texttt{abeja\_net\_v4\_postgres.sql} & Relacional & Esquema oficial + datos semilla de la BD \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\subsection{T\'ecnicas de Limpieza de Datos}
+
+\begin{table}[h!]
+  \centering
+  \caption{T\'ecnicas de limpieza aplicadas y su justificaci\'on}
+  \rowcolors{2}{grisCelda}{white}
+  \begin{tabularx}{\textwidth}{lX}
+    \toprule
+    \textbf{T\'ecnica} & \textbf{Justificaci\'on y Aplicaci\'on} \\
+    \midrule
+    Forward fill (ffill) por grupo & Variables de serie temporal: el valor m\'as reciente del mismo sensor es la mejor estimaci\'on de un dato faltante. Respeta la autocorrelaci\'on temporal. \\
+    Eliminaci\'on de duplicados     & Un sensor no puede tener dos lecturas en el mismo instante (\texttt{sensor\_id + fecha\_registro}). Duplicados exactos eliminados con \texttt{drop\_duplicates}. \\
+    Reglas de negocio (outliers)   & Temperatura fuera de $[0, 45]$\textcelsius{} o humedad fuera de $[0, 100]$\% son f\'isicamente imposibles $\rightarrow$ se invalidan como NaN y se reimputan. \\
+    Interpolaci\'on lineal (peso)   & El peso de la colmena crece de forma gradual y predecible. La interpolaci\'on lineal es apropiada entre puntos cercanos. \\
+    Mapeo de formatos               & \texttt{lluvia} pod\'ia llegar como \texttt{True/False}, \texttt{"si"/"no"} o \texttt{1/0}. Se normaliz\'o todo a entero $\{0, 1\}$. \\
+    Eliminaci\'on de hu\'erfanos    & Registros sin \texttt{sensor\_id} no pueden asociarse a ninguna colmena y se eliminan. \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\subsection{Par\'ametros de Configuraci\'on del Data Warehouse (PostgreSQL local)}
+
+\begin{lstlisting}[language=SQL, caption=Esquema y \'indices de optimizaci\'on para el DW]
+CREATE SCHEMA abejanet_dw;
+
+-- Indices principales para JOINs OLAP
+CREATE INDEX idx_fact_sk_sensor  ON fact_lecturas_ambientales (sk_sensor);
+CREATE INDEX idx_fact_sk_tiempo  ON fact_lecturas_ambientales (sk_tiempo);
+CREATE INDEX idx_fact_sk_colmena ON fact_lecturas_ambientales (sk_colmena);
+CREATE INDEX idx_dim_tiempo_fecha ON dim_tiempo (fecha_completa);
+CREATE INDEX idx_dim_tiempo_hora  ON dim_tiempo (hora, es_noche);
+
+-- postgresql.conf recomendado para analisis local
+-- shared_buffers       = 512MB
+-- work_mem             = 64MB
+-- effective_cache_size = 2GB
+-- max_parallel_workers_per_gather = 4
+\end{lstlisting}
+
+\subsection{Repositorio T\'ecnico}
+
+El conjunto de datos preprocesado, los scripts y los archivos de log se encuentran
+en el repositorio p\'ublico:
+
+\begin{center}
+  \url{https://github.com/MarkG777/Evaluacion_BD}
+\end{center}
+
+Los archivos entregados son:
+\texttt{data/raw/lecturas\_crudas.csv} (datos crudos),
+\texttt{data/clean/lecturas\_limpias.csv} (datos limpios) y
+\texttt{data/clean/dataset\_final\_features.csv} (dataset optimizado AU).

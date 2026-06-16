@@ -1,0 +1,257 @@
+
+=================================================================
+  PASO 0: Carga del Dataset Crudo
+=================================================================
+
+  Archivo cargado: data\raw\lecturas_crudas.csv
+  Shape inicial  : (8769, 13)  (8769 filas × 13 columnas)
+
+  Columnas:
+    sensor_id           : dtype=float64     nulos=   69  únicos=     3
+    mac_address         : dtype=str         nulos=    0  únicos=     3
+    tipo_sensor         : dtype=str         nulos=    0  únicos=     2
+    colmena_id          : dtype=int64       nulos=    0  únicos=     3
+    colmena_nombre      : dtype=str         nulos=    0  únicos=     3
+    apiario_nombre      : dtype=str         nulos=    0  únicos=     2
+    ubicacion           : dtype=str         nulos=    0  únicos=     2
+    temperatura         : dtype=float64     nulos=  356  únicos=  1749
+    humedad             : dtype=float64     nulos=  438  únicos=  3008
+    peso                : dtype=float64     nulos= 2921  únicos=   295
+    sonido              : dtype=float64     nulos=  267  únicos=  1977
+    lluvia              : dtype=str         nulos=    0  únicos=     4
+    fecha_registro      : dtype=str         nulos=    0  únicos=  2880
+
+  Vista previa (3 filas):
+   sensor_id        mac_address          tipo_sensor  colmena_id     colmena_nombre       apiario_nombre              ubicacion  temperatura  humedad   peso  sonido lluvia       fecha_registro
+0        3.0  A2:04:2A:B9:C1:D9          Multisensor           3   Colmena Beta Lab  Apiario Laboratorio  20.6597 N, 103.3496 W        19.45    77.85  16.04   46.95  False  2025-05-28 00:45:00
+1        1.0  AA:BB:CC:11:22:33  Temperatura/Humedad           1  Colmena Alfa Ppal    Apiario Principal   19.4326 N, 99.1332 W        21.82    70.67    NaN   47.10     no  2025-06-08 03:15:00
+2        1.0  AA:BB:CC:11:22:33  Temperatura/Humedad           1  Colmena Alfa Ppal    Apiario Principal   19.4326 N, 99.1332 W        21.62    70.35    NaN   51.94  False  2025-06-11 02:30:00
+
+  Estadísticas descriptivas (numéricas):
+       temperatura  humedad     peso   sonido
+count      8413.00  8331.00  5848.00  8502.00
+mean         27.20    62.36    15.91    57.67
+std           5.71    10.03     0.74     8.51
+min          -3.98    44.27    14.44    44.00
+25%          22.35    53.37    15.31    49.44
+50%          27.16    62.20    15.91    60.77
+75%          32.13    70.69    16.51    65.47
+max          56.96   111.95    17.38    70.00
+
+  Valores únicos en 'lluvia' (columna con formato mixto):
+    <StringArray>
+['False', 'no', 'True', 'si']
+Length: 4, dtype: str
+
+=================================================================
+  PASO 1: Corrección de Tipos y Formatos
+=================================================================
+
+  [1a] fecha_registro
+       Tipo antes : str
+       Tipo después: datetime64[us]
+       Fechas inválidas (→ NaT): 0
+
+  [1b] lluvia
+       Valores antes  : <StringArray>
+['False', 'no', 'True', 'si']
+Length: 4, dtype: str
+       Valores después: [0 1]
+       Tipo después   : int8
+
+  [1c] sensor_id
+       Tipo después: Int64  (NaN conservados: 69)
+
+  [1d] Columnas numéricas forzadas con pd.to_numeric(errors='coerce')
+
+  ── Resultado: Corrección de tipos y formatos ──
+  ANTES  →   8769 filas |  4051 nulos totales
+  DESPUÉS →   8769 filas |  4051 nulos totales
+  Δ filas: +0  |  Δ nulos: +0
+
+=================================================================
+  PASO 2: Eliminación de Registros Duplicados
+=================================================================
+
+  [2a] Duplicados exactos eliminados  : 127
+  [2b] Dup. (sensor_id + timestamp)   : 1
+       Criterio: mismo sensor no puede tener dos lecturas en el mismo instante.
+
+  ── Resultado: Eliminación de duplicados ──
+  ANTES  →   8769 filas |  4051 nulos totales
+  DESPUÉS →   8641 filas |  3979 nulos totales
+  Δ filas: -128  |  Δ nulos: -72
+
+=================================================================
+  PASO 3: Eliminación de Filas sin sensor_id (registros huérfanos)
+=================================================================
+
+  Filas sin sensor_id eliminadas: 68
+  Justificación: sin identificador de sensor no se puede trazar
+  la lectura a ninguna colmena → descartable para análisis.
+
+  ── Resultado: Eliminación registros huérfanos ──
+  ANTES  →   8641 filas |  3979 nulos totales
+  DESPUÉS →   8573 filas |  3884 nulos totales
+  Δ filas: -68  |  Δ nulos: -95
+
+=================================================================
+  PASO 4: Detección y Tratamiento de Outliers
+=================================================================
+
+  [temperatura (diagnóstico IQR)]
+    Q1=22.36  Q3=32.14  IQR=9.79
+    Límites IQR: [7.68, 46.82]
+    Outliers estadísticos: 86 (1.04%)
+    → Regla de negocio: temperatura fuera de [0.0, 45.0]°C → NaN
+    → Outliers invalidados: 76
+
+  [humedad (diagnóstico IQR)]
+    Q1=53.35  Q3=70.67  IQR=17.32
+    Límites IQR: [27.37, 96.65]
+    Outliers estadísticos: 67 (0.82%)
+    → Regla de negocio: humedad fuera de [0, 100]% → NaN
+    → Outliers invalidados: 67
+
+  [sonido (diagnóstico IQR)]
+    Q1=49.45  Q3=65.48  IQR=16.03
+    Límites IQR: [25.41, 89.53]
+    Outliers estadísticos: 0 (0.00%)
+    → Regla de negocio: sonido fuera de [15, 100] dB → NaN
+    → Outliers invalidados: 0
+
+  Total de outliers invalidados: 143
+
+  ── Resultado: Tratamiento de outliers ──
+  ANTES  →   8573 filas |  3884 nulos totales
+  DESPUÉS →   8573 filas |  4027 nulos totales
+  Δ filas: +0  |  Δ nulos: +143
+
+=================================================================
+  PASO 5: Imputación de Valores Nulos (Series Temporales)
+=================================================================
+
+  Nulos ANTES de imputación:
+    temperatura    :   418 (4.88%)
+    humedad        :   490 (5.72%)
+    sonido         :   256 (2.99%)
+    peso           :  2863 (33.40%)
+
+  [ffill+bfill] temperatura → nulos restantes: 0
+
+  [ffill+bfill] humedad → nulos restantes: 0
+
+  [ffill+bfill] sonido → nulos restantes: 0
+
+  [interpolación lineal] peso → nulos restantes: 2863
+    (Nulos en peso = colmenas sin sensor de peso; esto es CORRECTO)
+
+  Nulos DESPUÉS de imputación:
+    temperatura    :     0 (0.00%)
+    humedad        :     0 (0.00%)
+    sonido         :     0 (0.00%)
+    peso           :  2863 (33.40%)
+
+  ── Resultado: Imputación de nulos ──
+  ANTES  →   8573 filas |  4027 nulos totales
+  DESPUÉS →   8573 filas |  2863 nulos totales
+  Δ filas: +0  |  Δ nulos: -1164
+
+=================================================================
+  PASO 6: Normalización Sintáctica y Enriquecimiento de Features
+=================================================================
+
+  Columnas derivadas añadidas: año, mes, semana, dia_semana, hora,
+  es_fin_semana, es_noche, periodo_dia
+
+  Tipos finales:
+    sensor_id             : int64
+    mac_address           : str
+    tipo_sensor           : str
+    colmena_id            : int64
+    colmena_nombre        : str
+    apiario_nombre        : str
+    ubicacion             : str
+    temperatura           : float64
+    humedad               : float64
+    peso                  : float64
+    sonido                : float64
+    lluvia                : int8
+    fecha_registro        : datetime64[us]
+    año                   : int32
+    mes                   : int32
+    semana                : int64
+    dia_semana            : int32
+    hora                  : int32
+    es_fin_semana         : int8
+    es_noche              : int8
+    periodo_dia           : str
+
+=================================================================
+  PASO 7: Validación Final del Dataset Limpio
+=================================================================
+
+  Shape final: (8573, 21)
+
+  Estadísticas descriptivas post-limpieza:
+       temperatura   humedad      peso    sonido
+count     8573.000  8573.000  5710.000  8573.000
+mean        27.195    61.955    15.910    57.679
+std          5.104     9.157     0.737     8.509
+min          0.040    44.270    14.440    44.000
+25%         22.380    53.320    15.310    49.440
+50%         27.190    62.010    15.910    60.770
+75%         32.100    70.520    16.510    65.480
+max         35.940    79.580    17.380    70.000
+
+  Distribución por tipo de sensor:
+tipo_sensor
+Multisensor            5710
+Temperatura/Humedad    2863
+
+  Distribución por colmena:
+colmena_nombre
+Colmena Alfa Ppal     2863
+Colmena Gamma Ppal    2860
+Colmena Beta Lab      2850
+
+  Rango de fechas:
+    Mínima: 2025-05-15 00:00:00
+    Máxima: 2025-06-13 23:45:00
+
+  Nulos restantes por columna:
+peso    2863
+
+  ✅ Validaciones de rango superadas
+
+=================================================================
+  GUARDADO DEL DATASET LIMPIO
+=================================================================
+
+  ✅ Dataset limpio guardado: data\clean\lecturas_limpias.csv
+     Shape          : (8573, 21)
+     Columnas totales: 21
+     Columnas       : ['sensor_id', 'mac_address', 'tipo_sensor', 'colmena_id', 'colmena_nombre', 'apiario_nombre', 'ubicacion', 'temperatura', 'humedad', 'peso', 'sonido', 'lluvia', 'fecha_registro', 'año', 'mes', 'semana', 'dia_semana', 'hora', 'es_fin_semana', 'es_noche', 'periodo_dia']
+
+=================================================================
+  RESUMEN DEL PIPELINE DE LIMPIEZA
+=================================================================
+
+  Dataset original   :   8769 filas
+  Dataset final      :   8573 filas
+  Registros removidos:    196 (2.24%)
+
+  Pasos aplicados:
+  1. Corrección de tipos   → fechas, lluvia str→int, sensor_id nullable
+  2. Duplicados exactos    → eliminados
+  3. Dup. sensor+timestamp → eliminados
+  4. Huérfanos sin sensor  → eliminados
+  5. Outliers temperatura  → [0.0, 45.0°C] — inválidos → NaN → imputados
+  6. Outliers humedad      → [0, 100%]  — inválidos → NaN → imputados
+  7. Outliers sonido       → [15, 100 dB] — inválidos → NaN → imputados
+  8. Imputación nulos      → ffill+bfill por grupo de sensor (series temporales)
+  9. Peso                  → interpolación lineal por sensor (crecimiento gradual)
+  10. Enriquecimiento      → 8 features temporales derivadas
+
+  Log de ejecución guardado en: data\clean\log_limpieza.txt
+

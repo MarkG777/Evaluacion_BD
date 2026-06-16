@@ -1,0 +1,42 @@
+\section{Contexto del Caso de Estudio}
+
+\textbf{AbejaNet Revival} es una plataforma IoT para monitoreo en tiempo real de colmenas
+de abejas (\textit{Apis mellifera}). El sistema integra sensores ESP32 instalados en las
+colmenas para recopilar variables ambientales (temperatura, humedad, peso, decibelios y
+lluvia), un backend Node.js/Express con base de datos PostgreSQL, una aplicaci\'on m\'ovil
+React Native/Expo y un panel web de administraci\'on.
+
+La tabla \texttt{lecturas\_ambientales} de la base de datos operacional constituye la
+fuente principal de datos de esta evaluaci\'on. Dado que el servidor de producci\'on
+(Render) no estaba activo durante el periodo de desarrollo, los datos se generaron de forma
+sint\'etica con el script \texttt{00\_generar\_datos.py}, replicando la l\'ogica de
+simulaci\'on del archivo original \texttt{backend/generate\_mock\_data.js} del proyecto.
+
+\subsection{Arquitectura del Sistema}
+
+\begin{itemize}\setlength{\itemsep}{2pt}
+  \item \textbf{Sensores ESP32:} Env\'ian lecturas v\'ia POST \texttt{/api/sensor-data}
+        cada 10 minutos con autenticaci\'on por clave API.
+  \item \textbf{Backend Node.js/Express:} Recibe, valida y persiste los datos en
+        PostgreSQL alojado en Render.
+  \item \textbf{Aplicaci\'on m\'ovil:} Consume la API REST con autenticaci\'on JWT,
+        mostrando gr\'aficas de tendencias por colmena.
+  \item \textbf{Panel web:} Gesti\'on de usuarios, apiarios, colmenas y alertas.
+\end{itemize}
+
+\subsection{Colmenas Monitoreadas}
+
+\begin{table}[h!]
+  \centering
+  \rowcolors{2}{grisCelda}{white}
+  \begin{tabular}{llll}
+    \toprule
+    \textbf{Apiario} & \textbf{Colmena} & \textbf{MAC} & \textbf{Tipo Sensor} \\
+    \midrule
+    Apiario Principal   & Colmena Alfa Ppal  & AA:BB:CC:11:22:33 & Temperatura/Humedad \\
+    Apiario Principal   & Colmena Gamma Ppal & AA:BB:CC:11:22:44 & Multisensor \\
+    Apiario Laboratorio & Colmena Beta Lab   & A2:04:2A:B9:C1:D9 & Multisensor \\
+    \bottomrule
+  \end{tabular}
+  \caption{Inventario de colmenas y sensores del sistema AbejaNet}
+\end{table}

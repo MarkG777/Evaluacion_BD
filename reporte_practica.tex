@@ -1,0 +1,385 @@
+\documentclass[12pt,a4paper]{article}
+
+% ── Paquetes ──────────────────────────────────────────────────
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish,mexico]{babel}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage[table]{xcolor}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{setspace}
+\usepackage{hyperref}
+\usepackage{listings}
+
+% ── Geometría ─────────────────────────────────────────────────
+\geometry{margin=2.5cm}
+\setstretch{1.2}
+\setlength{\headheight}{14pt}
+
+% ── Colores ───────────────────────────────────────────────────
+\definecolor{verdeAbejaNet}{RGB}{76,175,80}
+\definecolor{azulEncabezado}{RGB}{33,47,61}
+\definecolor{grisCelda}{RGB}{245,245,245}
+\definecolor{rojoAlerta}{RGB}{198,40,40}
+\definecolor{codeBg}{RGB}{248,248,248}
+\definecolor{codeFrame}{RGB}{200,200,200}
+
+% ── Hiperenlaces ──────────────────────────────────────────────
+\hypersetup{
+  colorlinks=true,
+  linkcolor=azulEncabezado,
+  urlcolor=verdeAbejaNet,
+  pdftitle={Reporte Practica 1 -- AbejaNet},
+  pdfauthor={Marco Antonio Gomez Olvera},
+}
+
+% ── Encabezado y pie ──────────────────────────────────────────
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\textit{AbejaNet -- Preprocesamiento de Datos}}
+\fancyhead[R]{\small\textit{Extracci\'on de Conocimiento en BD}}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% ── T\'itulos ─────────────────────────────────────────────────
+\titleformat{\section}{\Large\bfseries\color{azulEncabezado}}{\thesection}{1em}{}
+\titleformat{\subsection}{\large\bfseries\color{azulEncabezado}}{\thesubsection}{1em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries\color{azulEncabezado}}{\thesubsubsection}{1em}{}
+
+% ── C\'odigo ──────────────────────────────────────────────────
+\lstset{
+  backgroundcolor=\color{codeBg},
+  frame=single, rulecolor=\color{codeFrame},
+  basicstyle=\ttfamily\footnotesize,
+  breaklines=true,
+  numbers=none,
+  keepspaces=true,
+}
+
+% ── Comandos ──────────────────────────────────────────────────
+\newcommand{\badge}[2]{\colorbox{#1}{\color{white}\textbf{\small #2}}}
+
+% ══════════════════════════════════════════════════════════════
+\begin{document}
+% ══════════════════════════════════════════════════════════════
+
+\input{sections/01_portada}
+
+\tableofcontents
+\newpage
+
+\input{sections/02_contexto}
+\newpage
+
+\input{sections/03_sa_arquitectura}
+\newpage
+
+\input{sections/04_de_limpieza}
+\newpage
+
+\input{sections/05_au_seleccion}
+\newpage
+
+\input{sections/06_entregables}
+
+\end{document}
+% ══ FIN ══
+
+% (contenido original en linea eliminado, ahora gestionado en sections/)
+\iffalse
+% ══════════════════════════════════════════════════════════════
+\section{Contexto del Caso de Estudio}
+% ══════════════════════════════════════════════════════════════
+
+\textbf{AbejaNet Revival} es una plataforma IoT para monitoreo en tiempo real de colmenas de abejas (\textit{Apis mellifera}). El sistema integra:
+
+\begin{itemize}\setlength{\itemsep}{0pt}
+  \item \textbf{Sensores ESP32} instalados en las colmenas: temperatura, humedad, peso, decibelios y lluvia.
+  \item \textbf{Backend Node.js/Express} con base de datos PostgreSQL (alojado en Render).
+  \item \textbf{Aplicaci\'on m\'ovil} React Native/Expo para visualizaci\'on por el apicultor.
+  \item \textbf{Panel web} de administraci\'on para gesti\'on de apiarios, usuarios y alertas.
+\end{itemize}
+
+La tabla \texttt{lecturas\_ambientales} de la BD operacional es la fuente principal de datos de esta pr\'actica. Dado que el servidor de Render no est\'a activo en este periodo, se generaron datos sint\'eticos fieles a la simulaci\'on del script original \texttt{backend/generate\_mock\_data.js}.
+
+% ══════════════════════════════════════════════════════════════
+\section{SA --- Arquitectura del Data Warehouse}
+% ══════════════════════════════════════════════════════════════
+
+\subsection{Esquema en Estrella (Star Schema)}
+
+Se dise\~n\'o un \textbf{Esquema en Estrella} con una tabla de hechos central y cuatro dimensiones:
+
+\begin{table}[h!]
+  \centering
+  \caption{Tabla de Hechos: \texttt{fact\_lecturas\_ambientales}}
+  \rowcolors{2}{grisCelda}{white}
+  \begin{tabularx}{\textwidth}{llX}
+    \toprule
+    \textbf{Columna} & \textbf{Tipo} & \textbf{Descripci\'on} \\
+    \midrule
+    \texttt{id\_lectura}  & BIGSERIAL PK  & Clave surrogate \\
+    \texttt{sk\_sensor}   & INTEGER FK    & $\rightarrow$ \texttt{dim\_sensor} \\
+    \texttt{sk\_tiempo}   & INTEGER FK    & $\rightarrow$ \texttt{dim\_tiempo} \\
+    \texttt{sk\_colmena}  & INTEGER FK    & $\rightarrow$ \texttt{dim\_colmena} \\
+    \texttt{sk\_apiario}  & INTEGER FK    & $\rightarrow$ \texttt{dim\_apiario} \\
+    \texttt{temperatura}  & DECIMAL(5,2)  & \textcelsius{} interior de la colmena \\
+    \texttt{humedad}      & DECIMAL(5,2)  & \% de humedad relativa \\
+    \texttt{peso}         & DECIMAL(6,2)  & kg totales de la colmena \\
+    \texttt{sonido}       & DECIMAL(5,2)  & dB de actividad son\'ora \\
+    \texttt{lluvia}       & SMALLINT      & 1~=~lluvia, 0~=~sin lluvia \\
+    \texttt{alerta\_temp} & SMALLINT      & 1 si temperatura $>$ 35\textcelsius{} \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\subsection{Inventario de Variables}
+
+\begin{table}[h!]
+  \centering
+  \caption{Clasificaci\'on de variables por tipo estad\'istico}
+  \rowcolors{2}{grisCelda}{white}
+  \begin{tabularx}{\textwidth}{llllX}
+    \toprule
+    \textbf{Variable} & \textbf{Tipo} & \textbf{Escala} & \textbf{Unidad} & \textbf{Rango esperado} \\
+    \midrule
+    \texttt{temperatura} & Continua    & Raz\'on   & \textcelsius{}  & $[0, 45]$ \\
+    \texttt{humedad}     & Continua    & Raz\'on   & \%              & $[40, 95]$ \\
+    \texttt{peso}        & Continua    & Raz\'on   & kg              & $[10, 30]$ \\
+    \texttt{sonido}      & Continua    & Raz\'on   & dB              & $[40, 80]$ \\
+    \texttt{lluvia}      & Discreta    & Nominal   & ---             & $\{0, 1\}$ \\
+    \texttt{tipo\_sensor}& Categ\'orica& Nominal   & ---             & Temp/Multisensor \\
+    \texttt{hora}        & Discreta    & C\'iclica & h               & $[0, 23]$ \\
+    \texttt{dia\_semana} & Discreta    & Ordinal   & ---             & $[0, 6]$ \\
+    \texttt{es\_noche}   & Discreta    & Nominal   & ---             & $\{0, 1\}$ \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\subsection{Fuentes de Datos}
+
+\begin{table}[h!]
+  \centering
+  \caption{Inventario de fuentes de datos}
+  \rowcolors{2}{grisCelda}{white}
+  \begin{tabularx}{\textwidth}{llX}
+    \toprule
+    \textbf{Fuente} & \textbf{Tipo} & \textbf{Descripci\'on} \\
+    \midrule
+    ESP32 POST \texttt{/api/sensor-data} & Estructurada en tiempo real & Lecturas c/10 min \\
+    \texttt{generate\_mock\_data.js} & Sint\'etica & Simulaci\'on 30 d\'ias (Node.js) \\
+    \texttt{00\_generar\_datos.py} & Sint\'etica & Dataset para esta pr\'actica (Python) \\
+    \texttt{abeja\_net\_v4\_postgres.sql} & Relacional & Esquema + semilla de la BD \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\subsection{Configuraci\'on PostgreSQL (DW local)}
+
+\begin{lstlisting}[language=SQL, caption=\'Indices de optimizaci\'on para el DW]
+CREATE SCHEMA abejanet_dw;
+CREATE INDEX idx_fact_sk_sensor ON fact_lecturas_ambientales (sk_sensor);
+CREATE INDEX idx_fact_sk_tiempo ON fact_lecturas_ambientales (sk_tiempo);
+CREATE INDEX idx_dim_tiempo_fecha ON dim_tiempo (fecha_completa);
+-- postgresql.conf sugerido:
+-- shared_buffers = 512MB | work_mem = 64MB | effective_cache_size = 2GB
+\end{lstlisting}
+
+% ══════════════════════════════════════════════════════════════
+\section{DE --- Reporte del Proceso de Limpieza}
+% ══════════════════════════════════════════════════════════════
+
+\subsection{Problemas de Calidad Introducidos}
+
+El script \texttt{00\_generar\_datos.py} genera datos sint\'eticos bas\'andose en la simulaci\'on de sensores ESP32, e introduce intencionalmente los siguientes problemas de calidad:
+
+\begin{table}[h!]
+  \centering
+  \caption{Problemas de calidad introducidos en el dataset}
+  \rowcolors{2}{grisCelda}{white}
+  \begin{tabularx}{\textwidth}{lrX}
+    \toprule
+    \textbf{Tipo de problema} & \textbf{Cantidad} & \textbf{T\'ecnica de limpieza} \\
+    \midrule
+    Nulos en \texttt{temperatura} & 346 (4\%) & Forward fill por grupo de sensor \\
+    Nulos en \texttt{humedad}     & 432 (5\%) & Forward fill por grupo de sensor \\
+    Nulos en \texttt{sonido}      & 259 (3\%) & Forward fill por grupo de sensor \\
+    Outliers temperatura $>$45\textcelsius{} o $<$0\textcelsius{} & 86 & Invalidar $\rightarrow$ NaN $\rightarrow$ imputar \\
+    Outliers humedad $>$100\%     & 69       & Invalidar $\rightarrow$ NaN $\rightarrow$ imputar \\
+    Filas duplicadas              & 129 (1.5\%) & \texttt{drop\_duplicates} \\
+    Formato incorrecto en lluvia (\texttt{"si"/"no"}) & 351 (4\%) & Mapeo a entero $\{0,1\}$ \\
+    Registros hu\'erfanos sin sensor\_id & 69 (0.8\%) & Eliminaci\'on \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\subsection{Resultados del Pipeline (Antes vs.\ Despu\'es)}
+
+\begin{table}[h!]
+  \centering
+  \caption{Evidencia cuantitativa del pipeline de limpieza}
+  \rowcolors{2}{grisCelda}{white}
+  \begin{tabularx}{\textwidth}{llrrr}
+    \toprule
+    \textbf{Paso} & \textbf{T\'ecnica} & \textbf{Antes} & \textbf{Despu\'es} & $\Delta$ \\
+    \midrule
+    0 & Carga del dataset crudo & 8\,769 & 8\,769 & --- \\
+    1 & Correcci\'on de tipos y formatos & 8\,769 & 8\,769 & 0 \\
+    2 & Eliminaci\'on de duplicados & 8\,769 & 8\,641 & $-128$ \\
+    3 & Eliminaci\'on de hu\'erfanos & 8\,641 & 8\,573 & $-68$ \\
+    4 & Invalidaci\'on de outliers & 8\,573 & 8\,573 & $+143$ nulos \\
+    5 & Imputaci\'on ffill+bfill & --- & --- & $-1\,164$ nulos \\
+    6 & Enriquecimiento temporal & 13 cols & 21 cols & $+8$ features \\
+    \midrule
+    \multicolumn{2}{l}{\textbf{Total registros removidos}} & \multicolumn{2}{r}{196 (2.24\%)} & --- \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\subsection{Estad\'isticas Post-limpieza (Paso 7 --- Validaci\'on Final)}
+
+\begin{lstlisting}[caption=Salida real del script 02\_de\_limpieza\_pipeline.py]
+         temperatura   humedad      peso    sonido
+count       8573.000  8573.000  5710.000  8573.000
+mean          27.195    61.955    15.910    57.679
+std            5.104     9.157     0.737     8.509
+min            0.040    44.270    14.440    44.000
+max           35.940    79.580    17.380    70.000
+
+Validaciones de rango superadas: temperatura [0,45] OK | humedad [0,100] OK | lluvia {0,1} OK
+Dataset limpio: 8573 filas x 21 columnas
+\end{lstlisting}
+
+% ══════════════════════════════════════════════════════════════
+\section{AU --- Selecci\'on de Caracter\'isticas Avanzada}
+% ══════════════════════════════════════════════════════════════
+
+\textbf{Variable objetivo:} \texttt{alerta\_temperatura} = 1 si temperatura $>$ 35\textcelsius{}
+
+\textit{Justificaci\'on:} Owens (1971) y Seeley (1985) documentan que por encima de 35\textcelsius{} las abejas de ventilaci\'on (\textit{fanners}) se activan masivamente, correlacionando con incremento de sonido, descenso de humedad y potencial p\'erdida de peso por enjambre.
+
+Distribuci\'on: 8\,364 negativos (97.6\%) --- 209 positivos (2.4\%).
+
+\subsection{M\'etodo 1 --- Correlaci\'on de Pearson}
+
+Se midi\'o la relaci\'on lineal de cada feature con \texttt{alerta\_temperatura}. Umbral de corte: $|r| \geq 0.02$.
+
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=\textwidth]{figures/fig1_heatmap_correlacion.png}
+  \caption{Matriz de correlaci\'on de Pearson completa (features candidatas + target)}
+\end{figure}
+
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=0.9\textwidth]{figures/fig2_pearson_target.png}
+  \caption{Correlaci\'on de Pearson de cada feature con \texttt{alerta\_temperatura}}
+\end{figure}
+
+Resultado: ninguna feature fue descartada por este m\'etodo --- todas tienen $|r| \geq 0.02$ con el target.
+
+\subsection{M\'etodo 2 --- Umbral de Varianza}
+
+Se descartaron features cuasi-constantes con varianza $< 0.01$.
+
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=0.9\textwidth]{figures/fig3_varianza.png}
+  \caption{Varianza de cada feature. L\'inea roja = umbral de 0.01}
+\end{figure}
+
+Resultado: ninguna feature descartada --- todas presentan varianza suficiente.
+
+\subsection{M\'etodo 3 --- Chi-Cuadrado ($\chi^2$)}
+
+Se evalu\'o la asociaci\'on estad\'istica de las variables discretas y categ\'oricas con el target ($\alpha = 0.05$).
+
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=0.85\textwidth]{figures/fig4_chi2_pvalues.png}
+  \caption{Resultados del test $\chi^2$. Verde = significativo ($p < 0.05$), rojo = no significativo}
+\end{figure}
+
+\textbf{Descartadas:} \texttt{lluvia} ($p = 0.324$) y \texttt{es\_fin\_semana} ($p = 0.565$) --- no existe asociaci\'on estad\'isticamente significativa con el target.
+
+\subsection{M\'etodo 4 --- Importancia con Random Forest}
+
+Se entren\'o un Random Forest con 150 \'arboles sobre las features supervivientes. Umbral de corte: importancia $\geq 0.02$.
+
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=0.9\textwidth]{figures/fig5_rf_importance.png}
+  \caption{Importancia (Gini) de features. Verde = retenida, rojo = descartada}
+\end{figure}
+
+\subsection{Resumen de Selecci\'on}
+
+\begin{table}[h!]
+  \centering
+  \caption{Features finales seleccionadas para el modelo}
+  \rowcolors{2}{grisCelda}{white}
+  \begin{tabularx}{\textwidth}{lrX}
+    \toprule
+    \textbf{Feature} & \textbf{Import. RF} & \textbf{Justificaci\'on} \\
+    \midrule
+    \texttt{humedad}        & 0.5316 & Correlaci\'on inversa fuerte con temperatura \\
+    \texttt{hora}           & 0.1285 & Temperatura sigue ciclo coseno diario \\
+    \texttt{sonido}         & 0.1224 & Actividad de abejas \textit{fanners} bajo estr\'es t\'ermico \\
+    \texttt{tipo\_sensor\_enc} & 0.0781 & Multisensores en distintos microclimas \\
+    \texttt{es\_noche}      & 0.0645 & Proxy binario del ciclo d\'ia/noche \\
+    \texttt{peso}           & 0.0447 & Enjambre por calor $\rightarrow$ p\'erdida de peso \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\begin{table}[h!]
+  \centering
+  \caption{Reducci\'on dimensional final}
+  \rowcolors{2}{grisCelda}{white}
+  \begin{tabular}{lr}
+    \toprule
+    \textbf{M\'etrica} & \textbf{Valor} \\
+    \midrule
+    Features candidatas iniciales & 12 \\
+    Descartadas por Pearson        & 0  \\
+    Descartadas por varianza       & 0  \\
+    Descartadas por Chi-cuadrado   & 2  \\
+    Descartadas por Random Forest  & 4  \\
+    \textbf{Features conservadas}  & \textbf{6} \\
+    \textbf{Reducci\'on}           & \textbf{50\%} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+% ══════════════════════════════════════════════════════════════
+\section{Archivos Entregados}
+% ══════════════════════════════════════════════════════════════
+
+\begin{table}[h!]
+  \centering
+  \caption{Repositorio de archivos generados}
+  \rowcolors{2}{grisCelda}{white}
+  \begin{tabularx}{\textwidth}{lX}
+    \toprule
+    \textbf{Archivo} & \textbf{Descripci\'on} \\
+    \midrule
+    \texttt{00\_generar\_datos.py} & Generador de dataset sint\'etico \\
+    \texttt{01\_sa\_arquitectura\_dw.md} & Documento SA: Star Schema + inventario \\
+    \texttt{02\_de\_limpieza\_pipeline.py} & Pipeline DE con evidencia antes/despu\'es \\
+    \texttt{03\_au\_seleccion\_caracteristicas.py} & Selecci\'on AU: 4 m\'etodos estad\'isticos \\
+    \texttt{data/raw/lecturas\_crudas.csv} & Dataset sucio (8\,769 filas, 13 cols) \\
+    \texttt{data/clean/lecturas\_limpias.csv} & Dataset limpio (8\,573 filas, 21 cols) \\
+    \texttt{data/clean/dataset\_final\_features.csv} & Dataset AU (8\,573 filas, 7 cols) \\
+    \texttt{data/clean/log\_limpieza.txt} & Log completo del pipeline DE \\
+    \texttt{data/clean/log\_seleccion.txt} & Log completo de la selecci\'on AU \\
+    \texttt{figures/fig1\dots fig5.png} & Evidencia visual (5 gr\'aficas) \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+\fi
