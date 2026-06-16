@@ -1,4 +1,6 @@
-# LaTeX auxiliares
+# LaTeX
+*.tex
+*.pdf
 *.aux
 *.log
 *.toc
